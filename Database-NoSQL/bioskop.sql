@@ -536,6 +536,7 @@ CREATE TABLE `users` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `username` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,
+  `role` enum('admin','customer') NOT NULL DEFAULT 'customer',
   `name` varchar(100) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
   `api_token` varchar(80) DEFAULT NULL,
@@ -547,10 +548,11 @@ CREATE TABLE `users` (
 -- Dumping data untuk tabel `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `password`, `name`, `email`, `api_token`, `created_at`, `updated_at`) VALUES
-(1, 'brian', '$2y$12$Ha8QOLT0WI09ku./jFXGB.CWXQ0boBUxu/bREtnRDvc5tvsSuwEWi', 'brian', NULL, 'k7Ebx2HBUM8BGASHuXnHosuCPiLFh4fzFmIyaC3r', '2025-10-30 10:00:08', '2025-10-31 01:33:44'),
-(2, 'bran', '$2y$12$cPEGSx.2jCg8XsXlnzwF8.tNvT.ONEVMnoluCX2LokcIPSM0Kv5s6', 'bran', NULL, '16blSId8HgBC6myqCDj0MPJ9mJeZQlIEEZKcb19E', '2025-10-30 16:08:24', '2025-10-30 20:05:32'),
-(3, 'yanto', '$2y$12$TxKwwrPONbp4cCoKuT5S8uuU.nBGDd/TQ6L064PoAxQksObXdqhyq', 'yanto', NULL, 'jHEp3pOXslbl9BFSfTCyzjjXNmxrPA1ys6HNM2xH', '2025-10-31 01:54:42', '2025-10-31 01:55:34');
+INSERT INTO `users` (`id`, `username`, `password`, `role`, `name`, `email`, `api_token`, `created_at`, `updated_at`) VALUES
+(1, 'brian', '$2y$12$Ha8QOLT0WI09ku./jFXGB.CWXQ0boBUxu/bREtnRDvc5tvsSuwEWi', 'customer', 'brian', NULL, 'k7Ebx2HBUM8BGASHuXnHosuCPiLFh4fzFmIyaC3r', '2025-10-30 10:00:08', '2025-10-31 01:33:44'),
+(2, 'bran', '$2y$12$cPEGSx.2jCg8XsXlnzwF8.tNvT.ONEVMnoluCX2LokcIPSM0Kv5s6', 'customer', 'bran', NULL, '16blSId8HgBC6myqCDj0MPJ9mJeZQlIEEZKcb19E', '2025-10-30 16:08:24', '2025-10-30 20:05:32'),
+(3, 'yanto', '$2y$12$TxKwwrPONbp4cCoKuT5S8uuU.nBGDd/TQ6L064PoAxQksObXdqhyq', 'customer', 'yanto', NULL, 'jHEp3pOXslbl9BFSfTCyzjjXNmxrPA1ys6HNM2xH', '2025-10-31 01:54:42', '2025-10-31 01:55:34'),
+(4, 'admin', '$2y$12$8i1Cdm42Hcps225y7sY9Vub0kGugHgdGXNqBJ38qRAjPR9U1FVLtO', 'admin', 'Administrator', 'admin@bioskop.local', 'admin-token-123', '2025-10-31 02:00:00', '2025-10-31 02:00:00');
 
 --
 -- Indexes for dumped tables
