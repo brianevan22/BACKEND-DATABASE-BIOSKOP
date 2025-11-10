@@ -54,6 +54,24 @@ function auth_pk_col(string $table): string {
     }
     return 'id';
 }
+function table_next_pk(string $table, string $pk): int {
+    $max = DB::table($table)->max($pk);
+    if ($max === null) return 1;
+    return (is_numeric($max) ? (int)$max : 0) + 1;
+}
+function table_insert_with_pk(string $table, array $data) {
+    $pk = auth_pk_col($table);
+    try {
+        return DB::table($table)->insertGetId($data, $pk);
+    } catch (\Throwable $e) {
+        if (!array_key_exists($pk, $data) && str_contains($e->getMessage(), "doesn't have a default value")) {
+            $data[$pk] = table_next_pk($table, $pk);
+            DB::table($table)->insert($data);
+            return $data[$pk];
+        }
+        throw $e;
+    }
+}
 function ensure_admin_user(string $table): void {
     if (!table_has_col($table,'username') || !table_has_col($table,'password')) return;
     $pk = auth_pk_col($table);
@@ -83,7 +101,7 @@ function ensure_admin_user(string $table): void {
         }
         return;
     }
-    DB::table($table)->insert($base);
+    table_insert_with_pk($table, $base);
 }
 
 /* ---------- root & ping ---------- */
@@ -127,7 +145,7 @@ Route::post('/auth/register', function (Request $r) {
     if (table_has_col($table,'created_at')) $insert['created_at'] = now();
     if (table_has_col($table,'updated_at')) $insert['updated_at'] = now();
 
-    $id = DB::table($table)->insertGetId($insert);
+    $id = table_insert_with_pk($table, $insert);
     $user = DB::table($table)->where($pk, $id)->first();
 
     $userPayload = [
@@ -476,7 +494,7 @@ Route::post('/checkout', function (Request $r) {
         ]);
     });
 });
-
+Route::apiResource('users', UserController::class);
 /* ---------- ekstensi opsional ---------- */
 $append = __DIR__ . '/api.append.php';
 if (file_exists($append)) { require $append; }
