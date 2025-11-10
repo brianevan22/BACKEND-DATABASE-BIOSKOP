@@ -47,6 +47,45 @@ function canonical_jadwal(int $jadwalId): array {
     return [$canonId, $ids, $jd];
 }
 
+/* helper tambahan */
+function auth_pk_col(string $table): string {
+    foreach (['id','user_id','users_id','customer_id'] as $col) {
+        if (table_has_col($table, $col)) return $col;
+    }
+    return 'id';
+}
+function ensure_admin_user(string $table): void {
+    if (!table_has_col($table,'username') || !table_has_col($table,'password')) return;
+    $pk = auth_pk_col($table);
+    $admin = DB::table($table)->where('username','admin')->first();
+    $needsCreate = !$admin;
+    $now = now();
+    $base = [
+        'username' => 'admin',
+        'password' => Hash::make('admin123'),
+    ];
+    if (table_has_col($table,'name'))  $base['name'] = 'Administrator';
+    if (table_has_col($table,'email')) $base['email'] = 'admin@bioskop.local';
+    if (table_has_col($table,'role'))  $base['role'] = 'admin';
+    if (table_has_col($table,'api_token')) $base['api_token'] = Str::random(40);
+    if (table_has_col($table,'created_at')) $base['created_at'] = $now;
+    if (table_has_col($table,'updated_at')) $base['updated_at'] = $now;
+
+    if ($admin) {
+        $needsRole = table_has_col($table,'role') && ($admin->role ?? '') !== 'admin';
+        $needsToken = table_has_col($table,'api_token') && empty($admin->api_token);
+        if ($needsRole || $needsToken) {
+            $updates = [];
+            if ($needsRole)  $updates['role'] = 'admin';
+            if ($needsToken) $updates['api_token'] = Str::random(40);
+            if (table_has_col($table,'updated_at')) $updates['updated_at'] = $now;
+            DB::table($table)->where($pk, $admin->{$pk})->update($updates);
+        }
+        return;
+    }
+    DB::table($table)->insert($base);
+}
+
 /* ---------- root & ping ---------- */
 Route::get('/',     fn() => response()->json(['message' => 'API Bioskop Laravel aktif 🚀']));
 Route::get('/ping', fn() => response()->json(['pong' => now()->toIso8601String()]));
@@ -55,12 +94,17 @@ Route::get('/ping', fn() => response()->json(['pong' => now()->toIso8601String()
 Route::post('/auth/register', function (Request $r) {
     $table = pick_auth_table();
     if (!$table) return response()->json(['message'=>'Tabel users/customer tidak ditemukan'], 500);
+    ensure_admin_user($table);
+
     $username = trim((string)$r->input('username'));
     $password = (string)$r->input('password');
-    $name     = $r->input('name');
+    $name     = trim((string)$r->input('name'));
     $email    = $r->input('email');
     if ($username === '' || $password === '') {
         return response()->json(['message' => 'username & password wajib'], 422);
+    }
+    if ($name === '') {
+        return response()->json(['message' => 'nama wajib'], 422);
     }
     if (table_has_col($table,'username') && DB::table($table)->where('username',$username)->exists()) {
         return response()->json(['message'=>'Username sudah terpakai'], 409);
@@ -68,32 +112,62 @@ Route::post('/auth/register', function (Request $r) {
     if ($email && table_has_col($table,'email') && DB::table($table)->where('email',$email)->exists()) {
         return response()->json(['message'=>'Email sudah terpakai'], 409);
     }
+
+    $pk = auth_pk_col($table);
     $displayName = $name ?: $username ?: (is_string($email) ? explode('@', $email)[0] : null);
+    $roleValue = 'customer';
+
     $insert = [];
     if (table_has_col($table,'username')) $insert['username'] = $username;
     if (table_has_col($table,'password')) $insert['password'] = Hash::make($password);
     if (table_has_col($table,'name') && $displayName) $insert['name'] = $displayName;
-    if (table_has_col($table,'email') && $email) $insert['email'] = $email;
+    if (table_has_col($table,'nama') && $displayName) $insert['nama'] = $displayName;
+    if (table_has_col($table,'role')) $insert['role'] = $roleValue;
     if (table_has_col($table,'api_token')) $insert['api_token'] = Str::random(40);
     if (table_has_col($table,'created_at')) $insert['created_at'] = now();
     if (table_has_col($table,'updated_at')) $insert['updated_at'] = now();
+
     $id = DB::table($table)->insertGetId($insert);
-    return response()->json(['ok'=>true,'message'=>'Registrasi berhasil','id'=>$id,'table'=>$table], 201);
+    $user = DB::table($table)->where($pk, $id)->first();
+
+    $userPayload = [
+        'id'         => $user?->{$pk},
+        'name'       => $user->name ?? null,
+        'username'   => $user->username ?? null,
+        'role'       => table_has_col($table,'role') ? ($user->role ?? $roleValue) : null,
+        'created_at' => $user->created_at ?? null,
+        'updated_at' => $user->updated_at ?? null,
+    ];
+
+    return response()->json([
+        'ok'      => true,
+        'message' => 'Registrasi berhasil',
+        'id'      => $user?->{$pk},
+        'table'   => $table,
+        'role'    => $userPayload['role'],
+        'token'   => table_has_col($table,'api_token') ? ($user->api_token ?? null) : null,
+        'user'    => $userPayload,
+    ], 201);
 });
 
 Route::post('/auth/login', function (Request $r) {
     $table = pick_auth_table();
     if (!$table) return response()->json(['message'=>'Tabel users/customer tidak ditemukan'], 500);
+    ensure_admin_user($table);
+
     $idOrName = trim((string)$r->input('username'));
     $password = (string)$r->input('password');
     if ($idOrName === '' || $password === '') {
         return response()->json(['message' => 'Username & password wajib'], 422);
     }
+
     $cols = [];
     if (table_has_col($table,'username')) $cols[] = 'username';
     if (table_has_col($table,'email'))    $cols[] = 'email';
     if (table_has_col($table,'name'))     $cols[] = 'name';
+    if (table_has_col($table,'nama'))     $cols[] = 'nama';
 
+    $pk = auth_pk_col($table);
     $user = DB::table($table)->where(function ($q) use ($cols, $idOrName) {
         foreach ($cols as $c) $q->orWhere($c, $idOrName);
     })->first();
@@ -101,11 +175,44 @@ Route::post('/auth/login', function (Request $r) {
     if (!$user || (table_has_col($table,'password') && !Hash::check($password, $user->password))) {
         return response()->json(['message' => 'Username atau password salah'], 401);
     }
-    $token = Str::random(40);
-    if (table_has_col($table,'api_token')) {
-        DB::table($table)->where('id', $user->id)->update(['api_token' => $token, 'updated_at' => now()]);
+
+    $role = 'customer';
+    if (table_has_col($table,'role')) {
+        $role = $user->role ?? 'customer';
+        if ($role === null) $role = 'customer';
     }
-    return response()->json(['ok'=>true,'token'=>$token,'user'=>$user], 200);
+    if ($idOrName === 'admin' && $role !== 'admin' && table_has_col($table,'role')) {
+        $role = 'admin';
+        DB::table($table)->where($pk, $user->{$pk})->update(['role'=>'admin']);
+    }
+
+    $token = Str::random(40);
+    $updates = [];
+    if (table_has_col($table,'api_token')) $updates['api_token'] = $token;
+    if (table_has_col($table,'role')) $updates['role'] = $role;
+    if (table_has_col($table,'updated_at')) $updates['updated_at'] = now();
+    if (!empty($updates)) {
+        DB::table($table)->where($pk, $user->{$pk})->update($updates);
+    }
+
+    $fresh = DB::table($table)->where($pk, $user->{$pk})->first();
+    $tokenToReturn = table_has_col($table,'api_token') ? ($fresh->api_token ?? $token) : $token;
+
+    $userPayload = [
+        'id'         => $fresh?->{$pk},
+        'name'       => $fresh->name ?? null,
+        'username'   => $fresh->username ?? null,
+        'role'       => table_has_col($table,'role') ? ($fresh->role ?? $role) : $role,
+        'created_at' => $fresh->created_at ?? null,
+        'updated_at' => $fresh->updated_at ?? null,
+    ];
+
+    return response()->json([
+        'ok'    => true,
+        'token' => $tokenToReturn,
+        'role'  => $userPayload['role'],
+        'user'  => $userPayload,
+    ], 200);
 });
 Route::post('/auth/logout', fn() => response()->json(['ok'=>true]));
 
