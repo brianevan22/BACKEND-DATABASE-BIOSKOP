@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 use App\Http\Controllers\Api\{
     FilmController,
@@ -346,12 +347,60 @@ Route::post('/checkout', function (Request $r) {
         'kursi_ids'   => 'required|array|min:1',
         'kursi_ids.*' => 'integer',
         'kasir_id'    => 'nullable|integer',
+        'client_time' => 'nullable|string', // optional ISO8601 dari klien
+        'client_tz'   => 'nullable|string', // optional timezone klien
     ]);
 
     $customerId = (int)$r->input('customer_id');
     $jadwalId   = (int)$r->input('jadwal_id');
     $ids        = $r->input('kursi_ids');
-    $kasirId    = $r->input('kasir_id');
+    $kasirIdReq = $r->input('kasir_id');
+
+    // ======= Tentukan kasir berdasarkan waktu (jika tidak diberikan) =======
+    // Gunakan waktu klien bila tersedia: field 'client_time' (ISO8601) atau header 'X-Client-Time'
+    $clientTimeRaw = $r->input('client_time') ?? $r->header('X-Client-Time') ?? null;
+    $clientTz      = $r->input('client_tz') ?? null;
+
+    if ($clientTimeRaw) {
+        try {
+            $now = Carbon::parse($clientTimeRaw);
+            if ($clientTz) {
+                // jika klien kirim timezone, set timezone agar jam sesuai zona klien
+                try { $now = $now->setTimezone($clientTz); } catch (\Throwable $e) { /* abaikan */ }
+            }
+        } catch (\Throwable $e) {
+            // parsing gagal -> fallback ke waktu server
+            $now = now();
+        }
+    } else {
+        $now = now();
+    }
+
+    // Definisi shift:
+    // - pagi : 05:00 - 11:59
+    // - siang : 12:00 - 17:59
+    // - malam : 18:00 - 04:59
+    $hour = (int)$now->format('H');
+    if ($hour >= 5 && $hour < 12) {
+        $shift = 'pagi';
+    } elseif ($hour >= 12 && $hour < 18) {
+        $shift = 'siang';
+    } else {
+        $shift = 'malam';
+    }
+
+    // Cari kasir pertama dengan shift tersebut (fallback null jika tidak ada)
+    $kasirFromTime = DB::table('kasir')->where('shift', $shift)->orderBy('kasir_id')->first();
+    $kasirIdTime = $kasirFromTime ? (int)$kasirFromTime->kasir_id : null;
+
+    // Gunakan kasir dari request bila tersedia, jika tidak gunakan yang berdasarkan waktu
+    $kasirId = null;
+    if (!empty($kasirIdReq)) {
+        $kasirId = (int)$kasirIdReq;
+    } else {
+        $kasirId = $kasirIdTime;
+    }
+    // =======================================================================
 
     [$canonId, $_group, $jd] = canonical_jadwal($jadwalId);
     if (!$canonId || !$jd) return response()->json(['message'=>'Jadwal tidak ditemukan'], 404);
@@ -444,7 +493,7 @@ Route::post('/checkout', function (Request $r) {
 
         $trx = [
             'customer_id'       => $customerId,
-            'kasir_id'          => $kasirId,
+            'kasir_id'          => $kasirId, // <- tersimpan sesuai waktu/request
             'tanggal_transaksi' => now(),
             'total_harga'       => $total,
         ];
