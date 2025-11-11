@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Waktu pembuatan: 11 Nov 2025 pada 07.46
+-- Waktu pembuatan: 11 Nov 2025 pada 09.43
 -- Versi server: 10.4.32-MariaDB
 -- Versi PHP: 8.2.12
 
@@ -256,9 +256,12 @@ CREATE TABLE `komentar` (
 --
 
 INSERT INTO `komentar` (`komentar_id`, `users_id`, `film_id`, `isi_komentar`, `rating`, `tanggal`) VALUES
-(1, 1, 2, 'Filmnya sangat inspiratif dan juga memotivasi untuk tetap semangat belajar', 5, '2025-09-27'),
-(2, 2, 3, 'Ceritanya lucu banget dan juga alurnya tidak membosankan', 5, '2025-09-27'),
-(3, 5, 4, 'Vibes seremnya dapet banget dan juga alur ceritanya yang gak seperti film horror pada umumnya', 4, '2025-09-27');
+(1, 6, 2, 'Filmnya sangat inspiratif dan juga memotivasi untuk tetap semangat belajar', 5, '2025-11-11'),
+(2, 6, 3, 'Ceritanya lucu banget dan juga alurnya tidak membosankan', 5, '2025-11-11'),
+(3, 5, 4, 'Vibes seremnya dapet banget dan juga alur ceritanya yang gak seperti film horror pada umumnya', 4, '2025-11-11'),
+(14, 5, 5, 'keren jir', 4, '2025-11-11'),
+(16, 5, 4, 'takutnyee', 5, '2025-11-11'),
+(41, 1, 2, 'Apakah Seru?', 5, '2025-11-11');
 
 -- --------------------------------------------------------
 
@@ -540,7 +543,7 @@ CREATE TABLE `users` (
 
 INSERT INTO `users` (`id_users`, `name`, `username`, `password`, `role`, `created_at`, `updated_at`) VALUES
 (1, 'Administrator', 'admin', '$2y$12$8i1Cdm42Hcps225y7sY9Vub0kGugHgdGXNqBJ38qRAjPR9U1FVLtO', 'admin', '2025-10-31 02:00:00', '2025-10-31 02:00:00'),
-(5, 'Brian Evan', 'brian', '$2y$12$QKp3o6BFF1k70WO4XbmRlOzqPG6Jy00xr8E7kh2c4WBOMhiM6TUh.', 'customer', '2025-11-10 22:50:28', '2025-11-10 23:40:56'),
+(5, 'Brian Evan', 'brian', '$2y$12$QKp3o6BFF1k70WO4XbmRlOzqPG6Jy00xr8E7kh2c4WBOMhiM6TUh.', 'customer', '2025-11-10 22:50:28', '2025-11-11 00:22:01'),
 (6, 'Dilla Ayu', 'dilla', '$2y$12$4H2LwY5PvZDM.dIhVMpY.eJ98AlufRlMnmS4p0.HKNq3/MOZRcKv.', 'customer', '2025-11-10 23:42:54', '2025-11-10 23:43:57');
 
 --
@@ -743,7 +746,7 @@ ALTER TABLE `kasir`
 -- AUTO_INCREMENT untuk tabel `komentar`
 --
 ALTER TABLE `komentar`
-  MODIFY `komentar_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `komentar_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
 
 --
 -- AUTO_INCREMENT untuk tabel `kursi`
