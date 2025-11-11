@@ -348,11 +348,34 @@ Route::post('/auth/login', function (Request $r) {
         'updated_at' => $fresh->updated_at ?? null,
     ];
 
+    // === MAP CUSTOMER ID (jika tabel customer ada) ===
+    $mappedCustomerId = null;
+    try {
+        if (Schema::hasTable('customer')) {
+            // prefer link via id_users
+            $userPk = auth_pk_col('users');
+            $userVal = $fresh->{$userPk} ?? null;
+            if ($userVal !== null) {
+                if (Schema::hasColumn('customer','id_users')) {
+                    $c = DB::table('customer')->where('id_users', $userVal)->first();
+                    if ($c) $mappedCustomerId = (int)($c->customer_id ?? $c->id ?? null);
+                }
+                if ($mappedCustomerId === null) {
+                    $c2 = DB::table('customer')->where('customer_id', $userVal)->first();
+                    if ($c2) $mappedCustomerId = (int)($c2->customer_id ?? $c2->id ?? null);
+                }
+            }
+        }
+    } catch (\Throwable $_) { /* ignore mapping errors */ }
+    // =================================================
+
     return response()->json([
-        'ok'    => true,
-        'token' => $tokenToReturn,
-        'role'  => $userPayload['role'],
-        'user'  => $userPayload,
+        'ok'           => true,
+        'token'        => $tokenToReturn,
+        'role'         => $userPayload['role'],
+        'user'         => $userPayload,
+        // tambahan: langsung kirim customer_id agar client tidak perlu lagi menebak
+        'customer_id'  => $mappedCustomerId,
     ], 200);
 });
 Route::post('/auth/logout', fn() => response()->json(['ok'=>true]));
@@ -473,10 +496,123 @@ Route::post('/checkout', function (Request $r) {
         'client_tz'   => 'nullable|string', // optional timezone klien
     ]);
 
-    $customerId = (int)$r->input('customer_id');
-    $jadwalId   = (int)$r->input('jadwal_id');
-    $ids        = $r->input('kursi_ids');
-    $kasirIdReq = $r->input('kasir_id');
+    // INPUT AWAL
+    $inputCustomer = (int)$r->input('customer_id'); // bisa berupa users.id_users OR customer.customer_id
+    $jadwalId      = (int)$r->input('jadwal_id');
+    $ids           = $r->input('kursi_ids');
+    $kasirIdReq    = $r->input('kasir_id');
+
+    // =========================================================
+    // Mapping customer: pastikan kita punya customer.customer_id yang valid
+    // - Coba beberapa pendekatan agar input (yang mungkin users.id_users atau customer.customer_id)
+    //   akan berhasil dipetakan ke customer.customer_id yang menjadi FK transaksi.
+    $customerForTrans = null;
+    if (Schema::hasTable('customer')) {
+        // 1) jika ada kolom id_users di customer, coba cari dengan id_users == input
+        if (Schema::hasColumn('customer', 'id_users')) {
+            $row = DB::table('customer')->where('id_users', $inputCustomer)->first();
+            if ($row) {
+                $customerForTrans = (int)($row->customer_id ?? $row->id ?? null);
+            }
+        }
+        // 2) jika belum ketemu, coba anggap input memang customer_id (legacy)
+        if ($customerForTrans === null) {
+            $row2 = DB::table('customer')->where('customer_id', $inputCustomer)->first();
+            if ($row2) $customerForTrans = (int)$row2->customer_id;
+        }
+    }
+
+    // 3) Jika belum ketemu, coba dari Authorization: jika ada Bearer token -> cari users by api_token,
+    //    lalu mapping ke customer via customer.id_users atau customer.customer_id
+    if ($customerForTrans === null) {
+        $authHeader = $r->header('Authorization') ?? $r->header('authorization') ?? '';
+        $token = null;
+        if (!empty($authHeader)) {
+            if (preg_match('/Bearer\s+(.+)/i', $authHeader, $m)) $token = $m[1];
+            else $token = $authHeader;
+        }
+        if ($token && Schema::hasTable('users') && Schema::hasColumn('users','api_token')) {
+            $userByToken = DB::table('users')->where('api_token', $token)->first();
+            if ($userByToken) {
+                $pkUser = auth_pk_col('users');
+                $uId = $userByToken->{$pkUser};
+                if (Schema::hasTable('customer')) {
+                    if (Schema::hasColumn('customer', 'id_users')) {
+                        $c = DB::table('customer')->where('id_users', $uId)->first();
+                        if ($c) $customerForTrans = (int)$c->customer_id;
+                    }
+                    if ($customerForTrans === null) {
+                        $c2 = DB::table('customer')->where('customer_id', $uId)->first();
+                        if ($c2) $customerForTrans = (int)$c2->customer_id;
+                    }
+                } else {
+                    // fallback: jika tidak ada tabel customer, gunakan user id (risiko FK)
+                    $customerForTrans = (int)$uId;
+                }
+            }
+        }
+    }
+
+    // 4) Jika masih belum, coba cek apakah input sama dengan users PK (mis. klien kirim users.id_users)
+    if ($customerForTrans === null && Schema::hasTable('users')) {
+        $pkUser = auth_pk_col('users');
+        $userByPk = DB::table('users')->where($pkUser, $inputCustomer)->first();
+        if ($userByPk) {
+            $uId = $userByPk->{$pkUser};
+            if (Schema::hasTable('customer')) {
+                if (Schema::hasColumn('customer','id_users')) {
+                    $c = DB::table('customer')->where('id_users', $uId)->first();
+                    if ($c) $customerForTrans = (int)$c->customer_id;
+                }
+                if ($customerForTrans === null) {
+                    $c2 = DB::table('customer')->where('customer_id', $uId)->first();
+                    if ($c2) $customerForTrans = (int)$c2->customer_id;
+                }
+            } else {
+                $customerForTrans = (int)$uId;
+            }
+        }
+    }
+
+    if ($customerForTrans === null) {
+        return response()->json([
+            'message' => 'Customer tidak ditemukan. Pastikan Anda menggunakan customer_id yang valid atau akun sudah tersinkron (login/register).'
+        ], 422);
+    }
+    // =========================================================
+
+    // === Prevent admin from performing checkout ===
+    try {
+        // 1) If request has Authorization Bearer token, prefer check that user role
+        $authHeader = $r->header('Authorization') ?? $r->header('authorization') ?? '';
+        $token = null;
+        if (!empty($authHeader)) {
+            if (preg_match('/Bearer\s+(.+)/i', $authHeader, $m)) $token = $m[1];
+            else $token = $authHeader;
+        }
+        if ($token && Schema::hasTable('users') && Schema::hasColumn('users','api_token')) {
+            $u = DB::table('users')->where('api_token', $token)->first();
+            if ($u && (isset($u->role) && strtolower($u->role) === 'admin')) {
+                return response()->json(['message' => 'Admin tidak boleh melakukan checkout'], 403);
+            }
+        }
+
+        // 2) If still not decided, check customerForTrans -> see if linked user has role admin
+        if ($customerForTrans !== null && Schema::hasTable('customer') && Schema::hasTable('users')) {
+            $cust = DB::table('customer')->where('customer_id', $customerForTrans)->first();
+            if ($cust) {
+                if (Schema::hasColumn('customer','id_users') && !empty($cust->id_users)) {
+                    $linkedUser = DB::table('users')->where(auth_pk_col('users'), $cust->id_users)->first();
+                    if ($linkedUser && (isset($linkedUser->role) && strtolower($linkedUser->role) === 'admin')) {
+                        return response()->json(['message' => 'Admin tidak boleh melakukan checkout'], 403);
+                    }
+                }
+            }
+        }
+    } catch (\Throwable $_) {
+        // ignore check errors and continue (safer to reject earlier), but we keep normal flow
+    }
+    // =========================================================
 
     // ======= Tentukan kasir berdasarkan waktu (jika tidak diberikan) =======
     // Gunakan waktu klien bila tersedia: field 'client_time' (ISO8601) atau header 'X-Client-Time'
@@ -570,7 +706,7 @@ Route::post('/checkout', function (Request $r) {
     };
 
     return DB::transaction(function () use (
-        $ids, $customerId, $canonId, $kasirId, $defaultPrice, $withTimestamps, $ensureKursiId, $filmId
+        $ids, $customerForTrans, $canonId, $kasirId, $defaultPrice, $withTimestamps, $ensureKursiId, $filmId
     ) {
         $kursiIds = array_map($ensureKursiId, $ids);
 
@@ -614,7 +750,7 @@ Route::post('/checkout', function (Request $r) {
         $total = array_sum(array_map(fn($t) => (int)round((float)($t->harga ?? 0)), $tiketRows));
 
         $trx = [
-            'customer_id'       => $customerId,
+            'customer_id'       => $customerForTrans,
             'kasir_id'          => $kasirId, // <- tersimpan sesuai waktu/request
             'tanggal_transaksi' => now(),
             'total_harga'       => $total,

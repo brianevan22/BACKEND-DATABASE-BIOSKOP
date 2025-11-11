@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Waktu pembuatan: 31 Okt 2025 pada 10.30
+-- Waktu pembuatan: 11 Nov 2025 pada 07.46
 -- Versi server: 10.4.32-MariaDB
 -- Versi PHP: 8.2.12
 
@@ -49,10 +49,11 @@ CREATE TABLE `cache_locks` (
 
 --
 -- Struktur dari tabel `customer`
--- (ubah: tambahkan kolom id_users sebagai link ke users.id_users)
+--
+
 CREATE TABLE `customer` (
   `customer_id` int(11) NOT NULL,
-  `id_users` bigint(20) UNSIGNED DEFAULT NULL,   -- kolom link ke tabel users
+  `id_users` bigint(20) UNSIGNED DEFAULT NULL,
   `nama` varchar(100) NOT NULL,
   `email` varchar(100) NOT NULL,
   `no_hp` varchar(20) DEFAULT NULL
@@ -63,11 +64,8 @@ CREATE TABLE `customer` (
 --
 
 INSERT INTO `customer` (`customer_id`, `id_users`, `nama`, `email`, `no_hp`) VALUES
-(1, 1, 'Fajar Hidayat', 'fajar.hidayat@gmail.com', '081234567895'),
-(2, 2, 'Gita Permata', 'gita.permata@gmail.com', '081234567896'),
-(3, 3, 'Hendra Saputra', 'hendra.saputra@gmail.com', '081234567897'),
-(4, 4, 'Indah Maharani', 'indah.maharani@gmail.com', '081234567898'),
-(5, NULL, 'Joko Purnomo', 'joko.purnomo@gmail.com', '081234567899');
+(11, 5, 'Brian Evan', 'brianevan22@gmail.com', '085108815888'),
+(12, 6, 'Dilla Ayu', 'dillaayu@gmail.com', '085806844421');
 
 -- --------------------------------------------------------
 
@@ -88,10 +86,9 @@ CREATE TABLE `detail_transaksi` (
 --
 
 INSERT INTO `detail_transaksi` (`detail_id`, `transaksi_id`, `tiket_id`, `film_id`, `harga`) VALUES
-(114, 54, 258, 2, 100000.00),
-(115, 54, 259, 2, 100000.00),
-(116, 54, 260, 2, 100000.00),
-(117, 54, 261, 2, 100000.00);
+(118, 64, 262, 2, 100000.00),
+(119, 65, 263, 2, 100000.00),
+(120, 66, 264, 2, 100000.00);
 
 -- --------------------------------------------------------
 
@@ -235,9 +232,9 @@ CREATE TABLE `kasir` (
 --
 
 INSERT INTO `kasir` (`kasir_id`, `nama`, `shift`, `no_hp`) VALUES
-(1, 'Rina Oktaviani', 'pagi', '081222334455'),
-(2, 'Slamet Wijaya', 'siang', '082233445566'),
-(3, 'Wulan Anggraini', 'malam', '083344556677');
+(1, 'Brian Evan', 'pagi', '081222334455'),
+(2, 'Amarrazan', 'siang', '082233445566'),
+(3, 'Ammar Gibran', 'malam', '083344556677');
 
 -- --------------------------------------------------------
 
@@ -486,9 +483,9 @@ INSERT INTO `tiket` (`tiket_id`, `jadwal_id`, `kursi_id`, `harga`, `status`) VAL
 (259, 16, 12, 100000.00, 'terjual'),
 (260, 16, 13, 100000.00, 'terjual'),
 (261, 16, 14, 100000.00, 'terjual'),
-(262, 16, 15, 100000.00, 'tersedia'),
-(263, 16, 78, 100000.00, 'tersedia'),
-(264, 16, 79, 100000.00, 'tersedia'),
+(262, 16, 15, 100000.00, 'terjual'),
+(263, 16, 78, 100000.00, 'terjual'),
+(264, 16, 79, 100000.00, 'terjual'),
 (265, 16, 80, 100000.00, 'tersedia'),
 (266, 16, 81, 100000.00, 'tersedia'),
 (267, 16, 82, 100000.00, 'tersedia'),
@@ -517,22 +514,18 @@ CREATE TABLE `transaksi` (
 --
 
 INSERT INTO `transaksi` (`transaksi_id`, `customer_id`, `kasir_id`, `tanggal_transaksi`, `total_harga`) VALUES
-(29, 1, NULL, '2025-10-30', 1300000.00),
-(30, 1, NULL, '2025-10-30', 975000.00),
-(31, 1, NULL, '2025-10-30', 650000.00),
-(32, 1, NULL, '2025-10-30', 650000.00),
-(34, 1, NULL, '2025-10-31', 150000.00),
-(52, 1, NULL, '2025-10-31', 75000.00),
-(53, 1, NULL, '2025-10-31', 100000.00),
-(54, 1, NULL, '2025-10-31', 400000.00);
+(64, 11, 1, '2025-11-11', 100000.00),
+(65, 11, 1, '2025-11-11', 100000.00),
+(66, 12, 1, '2025-11-11', 100000.00);
 
 -- --------------------------------------------------------
 
 --
 -- Struktur dari tabel `users`
--- (ubah kolom id menjadi id_users)
+--
+
 CREATE TABLE `users` (
-  `id_users` bigint(20) UNSIGNED NOT NULL,  -- ganti nama PK
+  `id_users` bigint(20) UNSIGNED NOT NULL,
   `name` varchar(100) NOT NULL,
   `username` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,
@@ -546,10 +539,9 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id_users`, `name`, `username`, `password`, `role`, `created_at`, `updated_at`) VALUES
-(1, 'brian', 'brian', '$2y$12$Ha8QOLT0WI09ku./jFXGB.CWXQ0boBUxu/bREtnRDvc5tvsSuwEWi', 'customer', '2025-10-30 10:00:08', '2025-10-31 01:33:44'),
-(2, 'bran', 'bran', '$2y$12$cPEGSx.2jCg8XsXlnzwF8.tNvT.ONEVMnoluCX2LokcIPSM0Kv5s6', 'customer', '2025-10-30 16:08:24', '2025-10-30 20:05:32'),
-(3, 'yanto', 'yanto', '$2y$12$TxKwwrPONbp4cCoKuT5S8uuU.nBGDd/TQ6L064PoAxQksObXdqhyq', 'customer', '2025-10-31 01:54:42', '2025-10-31 01:55:34'),
-(4, 'Administrator', 'admin', '$2y$12$8i1Cdm42Hcps225y7sY9Vub0kGugHgdGXNqBJ38qRAjPR9U1FVLtO', 'admin', '2025-10-31 02:00:00', '2025-10-31 02:00:00');
+(1, 'Administrator', 'admin', '$2y$12$8i1Cdm42Hcps225y7sY9Vub0kGugHgdGXNqBJ38qRAjPR9U1FVLtO', 'admin', '2025-10-31 02:00:00', '2025-10-31 02:00:00'),
+(5, 'Brian Evan', 'brian', '$2y$12$QKp3o6BFF1k70WO4XbmRlOzqPG6Jy00xr8E7kh2c4WBOMhiM6TUh.', 'customer', '2025-11-10 22:50:28', '2025-11-10 23:40:56'),
+(6, 'Dilla Ayu', 'dilla', '$2y$12$4H2LwY5PvZDM.dIhVMpY.eJ98AlufRlMnmS4p0.HKNq3/MOZRcKv.', 'customer', '2025-11-10 23:42:54', '2025-11-10 23:43:57');
 
 --
 -- Indexes for dumped tables
@@ -703,13 +695,13 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT untuk tabel `customer`
 --
 ALTER TABLE `customer`
-  MODIFY `customer_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `customer_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT untuk tabel `detail_transaksi`
 --
 ALTER TABLE `detail_transaksi`
-  MODIFY `detail_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=118;
+  MODIFY `detail_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=121;
 
 --
 -- AUTO_INCREMENT untuk tabel `failed_jobs`
@@ -781,13 +773,13 @@ ALTER TABLE `tiket`
 -- AUTO_INCREMENT untuk tabel `transaksi`
 --
 ALTER TABLE `transaksi`
-  MODIFY `transaksi_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=55;
+  MODIFY `transaksi_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=67;
 
 --
 -- AUTO_INCREMENT untuk tabel `users`
 --
 ALTER TABLE `users`
-  MODIFY `id_users` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id_users` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- Ketidakleluasaan untuk tabel pelimpahan (Dumped Tables)
