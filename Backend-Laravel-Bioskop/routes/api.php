@@ -50,25 +50,49 @@ function canonical_jadwal(int $jadwalId): array {
 
 /* helper tambahan */
 function auth_pk_col(string $table): string {
-    foreach (['id','user_id','users_id','customer_id'] as $col) {
+    // Prioritas cek nama kolom PK yang mungkin dipakai oleh project:
+    foreach (['id_users','users_id','id','user_id','usersid','customer_id'] as $col) {
         if (table_has_col($table, $col)) return $col;
     }
     return 'id';
 }
-function table_next_pk(string $table, string $pk): int {
-    $max = DB::table($table)->max($pk);
-    if ($max === null) return 1;
-    return (is_numeric($max) ? (int)$max : 0) + 1;
+
+function table_smallest_missing_pk(string $table, string $pk): int {
+    // cari nilai integer terkecil >0 yang belum ada di kolom $pk
+    $rows = DB::table($table)->pluck($pk)->toArray();
+    $set = [];
+    foreach ($rows as $v) {
+        if (is_numeric($v)) $set[(int)$v] = true;
+    }
+    $i = 1;
+    while (true) {
+        if (!isset($set[$i])) return $i;
+        $i++;
+    }
 }
+
 function table_insert_with_pk(string $table, array $data) {
     $pk = auth_pk_col($table);
     try {
         return DB::table($table)->insertGetId($data, $pk);
     } catch (\Throwable $e) {
-        if (!array_key_exists($pk, $data) && str_contains($e->getMessage(), "doesn't have a default value")) {
-            $data[$pk] = table_next_pk($table, $pk);
-            DB::table($table)->insert($data);
-            return $data[$pk];
+        // jika gagal karena kolom PK tidak auto increment / butuh explicit value,
+        // coba isi dengan smallest missing PK (mengisi gap)
+        try {
+            if (!array_key_exists($pk, $data)) {
+                $available = table_smallest_missing_pk($table, $pk);
+                $data[$pk] = $available;
+                DB::table($table)->insert($data);
+                return $data[$pk];
+            }
+        } catch (\Throwable $_) {
+            // fallback lama: next pk (max+1)
+            if (!array_key_exists($pk, $data)) {
+                $max = DB::table($table)->max($pk);
+                $data[$pk] = (is_numeric($max) ? ((int)$max + 1) : 1);
+                DB::table($table)->insert($data);
+                return $data[$pk];
+            }
         }
         throw $e;
     }
@@ -111,61 +135,110 @@ Route::get('/ping', fn() => response()->json(['pong' => now()->toIso8601String()
 
 /* ---------- AUTH ---------- */
 Route::post('/auth/register', function (Request $r) {
-    $table = pick_auth_table();
-    if (!$table) return response()->json(['message'=>'Tabel users/customer tidak ditemukan'], 500);
-    ensure_admin_user($table);
+    // Validasi input (email & no_hp sekarang wajib)
+    $r->validate([
+        'username' => 'required|string',
+        'password' => 'required|string',
+        'name'     => 'required|string',
+        'email'    => 'required|email',
+        'no_hp'    => 'required|string',
+    ]);
+
+    // Pastikan tabel users ada (project anda memakai users sebagai table auth)
+    if (!Schema::hasTable('users')) {
+        return response()->json(['message' => 'Tabel users tidak ditemukan'], 500);
+    }
 
     $username = trim((string)$r->input('username'));
     $password = (string)$r->input('password');
     $name     = trim((string)$r->input('name'));
-    $email    = $r->input('email');
-    if ($username === '' || $password === '') {
-        return response()->json(['message' => 'username & password wajib'], 422);
+    $email    = trim((string)$r->input('email'));
+    $noHp     = trim((string)$r->input('no_hp'));
+
+    // Cek username/email uniqueness di users
+    if (Schema::hasColumn('users','username') && DB::table('users')->where('username', $username)->exists()) {
+        return response()->json(['message' => 'Username sudah terpakai'], 409);
     }
-    if ($name === '') {
-        return response()->json(['message' => 'nama wajib'], 422);
-    }
-    if (table_has_col($table,'username') && DB::table($table)->where('username',$username)->exists()) {
-        return response()->json(['message'=>'Username sudah terpakai'], 409);
-    }
-    if ($email && table_has_col($table,'email') && DB::table($table)->where('email',$email)->exists()) {
-        return response()->json(['message'=>'Email sudah terpakai'], 409);
+    if (Schema::hasColumn('users','email') && DB::table('users')->where('email', $email)->exists()) {
+        return response()->json(['message' => 'Email sudah terpakai'], 409);
     }
 
-    $pk = auth_pk_col($table);
-    $displayName = $name ?: $username ?: (is_string($email) ? explode('@', $email)[0] : null);
-    $roleValue = 'customer';
+    // Persiapkan data untuk tabel users
+    $userInsert = [
+        'username' => $username,
+        'password' => Hash::make($password),
+    ];
+    if (Schema::hasColumn('users','name')) $userInsert['name'] = $name;
+    if (Schema::hasColumn('users','role')) $userInsert['role'] = 'customer';
+    if (Schema::hasColumn('users','api_token')) $userInsert['api_token'] = Str::random(40);
+    if (Schema::hasColumn('users','created_at')) $userInsert['created_at'] = now();
+    if (Schema::hasColumn('users','updated_at')) $userInsert['updated_at'] = now();
 
-    $insert = [];
-    if (table_has_col($table,'username')) $insert['username'] = $username;
-    if (table_has_col($table,'password')) $insert['password'] = Hash::make($password);
-    if (table_has_col($table,'name') && $displayName) $insert['name'] = $displayName;
-    if (table_has_col($table,'nama') && $displayName) $insert['nama'] = $displayName;
-    if (table_has_col($table,'role')) $insert['role'] = $roleValue;
-    if (table_has_col($table,'api_token')) $insert['api_token'] = Str::random(40);
-    if (table_has_col($table,'created_at')) $insert['created_at'] = now();
-    if (table_has_col($table,'updated_at')) $insert['updated_at'] = now();
+    // Insert ke users, gunakan helper agar kompatibel dg PK berbeda
+    try {
+        $userId = table_insert_with_pk('users', $userInsert);
+    } catch (\Throwable $e) {
+        return response()->json(['message' => 'Gagal membuat user', 'error' => $e->getMessage()], 500);
+    }
 
-    $id = table_insert_with_pk($table, $insert);
-    $user = DB::table($table)->where($pk, $id)->first();
+    // Jika ada tabel customer -> buat atau update entry customer dengan kolom id_users = userId
+    $customerCreated = false;
+    if (Schema::hasTable('customer')) {
+        // gunakan kolom id_users di tabel customer sebagai link ke users
+        $custPk = Schema::hasColumn('customer','customer_id') ? 'customer_id' : 'id'; // customer PK tetap independen
+        $custData = [];
+        // link ke users lewat kolom id_users
+        if (Schema::hasColumn('customer','id_users')) {
+            $custData['id_users'] = $userId;
+        } else {
+            // jika belum ada kolom id_users, coba set customer_id = smallest missing (fallback legacy)
+            $custData[$custPk] = table_smallest_missing_pk('customer', $custPk);
+        }
 
-    $userPayload = [
-        'id'         => $user?->{$pk},
-        'name'       => $user->name ?? null,
-        'username'   => $user->username ?? null,
-        'role'       => table_has_col($table,'role') ? ($user->role ?? $roleValue) : null,
+        if (Schema::hasColumn('customer','nama')) $custData['nama'] = $name;
+        if (Schema::hasColumn('customer','email') && $email) $custData['email'] = $email;
+        if (Schema::hasColumn('customer','no_hp') && $noHp) $custData['no_hp'] = $noHp;
+        if (Schema::hasColumn('customer','created_at')) $custData['created_at'] = now();
+        if (Schema::hasColumn('customer','updated_at')) $custData['updated_at'] = now();
+
+        try {
+            // jika sudah ada link id_users -> update, jika belum, insert (customer_id auto handled)
+            if (isset($custData['id_users'])) {
+                $exists = DB::table('customer')->where('id_users', $userId)->exists();
+                if ($exists) {
+                    DB::table('customer')->where('id_users', $userId)->update($custData);
+                } else {
+                    DB::table('customer')->insert($custData);
+                }
+            } else {
+                // fallback insert (explicit PK) — helper akan mencari smallest missing
+                table_insert_with_pk('customer', $custData);
+            }
+            $customerCreated = true;
+        } catch (\Throwable $_) {
+            $customerCreated = false;
+        }
+    }
+
+    // Ambil kembali user untuk payload
+    $pkUser = auth_pk_col('users');
+    $user = DB::table('users')->where($pkUser, $userId)->first();
+
+    $payloadUser = [
+        'id' => $user?->{$pkUser},
+        'name' => $user->name ?? null,
+        'username' => $user->username ?? null,
+        'role' => $user->role ?? 'customer',
         'created_at' => $user->created_at ?? null,
         'updated_at' => $user->updated_at ?? null,
     ];
 
     return response()->json([
-        'ok'      => true,
+        'ok' => true,
         'message' => 'Registrasi berhasil',
-        'id'      => $user?->{$pk},
-        'table'   => $table,
-        'role'    => $userPayload['role'],
-        'token'   => table_has_col($table,'api_token') ? ($user->api_token ?? null) : null,
-        'user'    => $userPayload,
+        'id' => $userId,
+        'user' => $payloadUser,
+        'customer_created' => $customerCreated,
     ], 201);
 });
 
@@ -204,6 +277,55 @@ Route::post('/auth/login', function (Request $r) {
         $role = 'admin';
         DB::table($table)->where($pk, $user->{$pk})->update(['role'=>'admin']);
     }
+
+    // ==== SINKRON CUSTOMER OTOMATIS (untuk perubahan manual di DB) ====
+    // Jika tabel customer ada: buat/update saat role=customer, hapus saat role!=customer
+    try {
+        if (Schema::hasTable('customer')) {
+            $userPk = $this->exists ?? null; // placeholder to keep linter quiet
+            $userId = $user->{$pk};
+
+            // tentukan PK customer (customer_id atau id)
+            $custPk = Schema::hasColumn('customer','customer_id') ? 'customer_id' : (Schema::hasColumn('customer','id') ? 'id' : 'customer_id');
+
+            if ($role === 'customer') {
+                $custData = [$custPk => $userId];
+                if (Schema::hasColumn('customer','nama')) {
+                    $custData['nama'] = $user->name ?? $user->username ?? null;
+                }
+                if (Schema::hasColumn('customer','email') && property_exists($user, 'email')) {
+                    $custData['email'] = $user->email ?? null;
+                }
+                // no_hp tidak ada di users default — jika dikirim di users, ambil; kalau tidak, biarkan null
+                if (Schema::hasColumn('customer','no_hp') && property_exists($user, 'no_hp')) {
+                    $custData['no_hp'] = $user->no_hp ?? null;
+                }
+
+                $existsCust = DB::table('customer')->where($custPk, $userId)->exists();
+                if ($existsCust) {
+                    // update hanya field yang bukan null
+                    $upd = array_filter($custData, fn($v) => !is_null($v) && $v !== '');
+                    if (!empty($upd)) {
+                        if (Schema::hasColumn('customer','updated_at')) $upd['updated_at'] = now();
+                        DB::table('customer')->where($custPk, $userId)->update($upd);
+                    }
+                } else {
+                    // insert dengan pk eksplisit, fallback ke helper bila perlu
+                    try {
+                        DB::table('customer')->insert($custData);
+                    } catch (\Throwable $ex) {
+                        try { table_insert_with_pk('customer', $custData); } catch (\Throwable $_) { /* ignore */ }
+                    }
+                }
+            } else {
+                // bila role bukan customer -> hapus data customer jika ada
+                DB::table('customer')->where($custPk, $userId)->delete();
+            }
+        }
+    } catch (\Throwable $_) {
+        // Jangan batalkan login kalau sinkron gagal; log jika perlu
+    }
+    // ===================================================================
 
     $token = Str::random(40);
     $updates = [];

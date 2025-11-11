@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Models\Customer;
 use App\Http\Resources\CustomerResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB; // <-- tambahkan
+use Illuminate\Support\Facades\Schema; // <-- tambahkan
 
 class CustomerController extends \App\Http\Controllers\Controller
 {
@@ -43,6 +45,17 @@ class CustomerController extends \App\Http\Controllers\Controller
 
     public function destroy($id)
     {
+        // sinkron: jika ada user dengan id_users == customer id (link), hapus juga
+        try {
+            if (Schema::hasTable('users')) {
+                // tentukan PK users (id_users atau id)
+                $userPk = Schema::hasColumn('users','id_users') ? 'id_users' : (Schema::hasColumn('users','id') ? 'id' : 'id_users');
+                DB::table('users')->where($userPk, (int)$id)->delete();
+            }
+        } catch (\Throwable $_) {
+            // jangan batalkan; hanya mencoba sinkron
+        }
+
         $row = Customer::findOrFail($id);
         $row->delete();
         return response()->json(['deleted' => true]);

@@ -49,10 +49,10 @@ CREATE TABLE `cache_locks` (
 
 --
 -- Struktur dari tabel `customer`
---
-
+-- (ubah: tambahkan kolom id_users sebagai link ke users.id_users)
 CREATE TABLE `customer` (
   `customer_id` int(11) NOT NULL,
+  `id_users` bigint(20) UNSIGNED DEFAULT NULL,   -- kolom link ke tabel users
   `nama` varchar(100) NOT NULL,
   `email` varchar(100) NOT NULL,
   `no_hp` varchar(20) DEFAULT NULL
@@ -62,12 +62,12 @@ CREATE TABLE `customer` (
 -- Dumping data untuk tabel `customer`
 --
 
-INSERT INTO `customer` (`customer_id`, `nama`, `email`, `no_hp`) VALUES
-(1, 'Fajar Hidayat', 'fajar.hidayat@gmail.com', '081234567895'),
-(2, 'Gita Permata', 'gita.permata@gmail.com', '081234567896'),
-(3, 'Hendra Saputra', 'hendra.saputra@gmail.com', '081234567897'),
-(4, 'Indah Maharani', 'indah.maharani@gmail.com', '081234567898'),
-(5, 'Joko Purnomo', 'joko.purnomo@gmail.com', '081234567899');
+INSERT INTO `customer` (`customer_id`, `id_users`, `nama`, `email`, `no_hp`) VALUES
+(1, 1, 'Fajar Hidayat', 'fajar.hidayat@gmail.com', '081234567895'),
+(2, 2, 'Gita Permata', 'gita.permata@gmail.com', '081234567896'),
+(3, 3, 'Hendra Saputra', 'hendra.saputra@gmail.com', '081234567897'),
+(4, 4, 'Indah Maharani', 'indah.maharani@gmail.com', '081234567898'),
+(5, NULL, 'Joko Purnomo', 'joko.purnomo@gmail.com', '081234567899');
 
 -- --------------------------------------------------------
 
@@ -530,10 +530,9 @@ INSERT INTO `transaksi` (`transaksi_id`, `customer_id`, `kasir_id`, `tanggal_tra
 
 --
 -- Struktur dari tabel `users`
---
-
+-- (ubah kolom id menjadi id_users)
 CREATE TABLE `users` (
-  `id` bigint(20) UNSIGNED NOT NULL,
+  `id_users` bigint(20) UNSIGNED NOT NULL,  -- ganti nama PK
   `name` varchar(100) NOT NULL,
   `username` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,
@@ -546,7 +545,7 @@ CREATE TABLE `users` (
 -- Dumping data untuk tabel `users`
 --
 
-INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `created_at`, `updated_at`) VALUES
+INSERT INTO `users` (`id_users`, `name`, `username`, `password`, `role`, `created_at`, `updated_at`) VALUES
 (1, 'brian', 'brian', '$2y$12$Ha8QOLT0WI09ku./jFXGB.CWXQ0boBUxu/bREtnRDvc5tvsSuwEWi', 'customer', '2025-10-30 10:00:08', '2025-10-31 01:33:44'),
 (2, 'bran', 'bran', '$2y$12$cPEGSx.2jCg8XsXlnzwF8.tNvT.ONEVMnoluCX2LokcIPSM0Kv5s6', 'customer', '2025-10-30 16:08:24', '2025-10-30 20:05:32'),
 (3, 'yanto', 'yanto', '$2y$12$TxKwwrPONbp4cCoKuT5S8uuU.nBGDd/TQ6L064PoAxQksObXdqhyq', 'customer', '2025-10-31 01:54:42', '2025-10-31 01:55:34'),
@@ -693,7 +692,7 @@ ALTER TABLE `transaksi`
 -- Indeks untuk tabel `users`
 --
 ALTER TABLE `users`
-  ADD PRIMARY KEY (`id`),
+  ADD PRIMARY KEY (`id_users`),
   ADD UNIQUE KEY `username` (`username`);
 
 --
@@ -788,7 +787,7 @@ ALTER TABLE `transaksi`
 -- AUTO_INCREMENT untuk tabel `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id_users` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- Ketidakleluasaan untuk tabel pelimpahan (Dumped Tables)
