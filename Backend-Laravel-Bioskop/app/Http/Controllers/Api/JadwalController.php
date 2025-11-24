@@ -10,6 +10,13 @@ use Illuminate\Support\Facades\Schema;
 class JadwalController extends Controller
 {
     private const MIN_SEATS_PER_STUDIO = 15; // minimal 15 kursi / studio
+    private const DESIRED_LAYOUT = [
+        'A' => 8,
+        'B' => 8,
+        'C' => 8,
+        'D' => 8,
+        'E' => 10,
+    ];
 
     private function hasCol(string $table, string $col): bool
     {
@@ -52,34 +59,42 @@ class JadwalController extends Controller
         return [$canonId, $ids, $jd];
     }
 
+    private function desiredSeatList(): array
+    {
+        $list = [];
+        foreach (self::DESIRED_LAYOUT as $row => $count) {
+            for ($i = 1; $i <= $count; $i++) {
+                $list[] = $row . $i;
+            }
+        }
+        return $list;
+    }
+
     /**
      * Pastikan minimal 15 kursi tercatat pada studio:
      * A1..A15 (studio 1), B1..B15 (studio 2), dst.
      */
-    private function ensureStudioSeats(int $studioId): void
+    private function ensureStudioSeats(int $studioId): array
     {
-        $prefix   = $this->studioPrefix($studioId);
-        $minCount = self::MIN_SEATS_PER_STUDIO;
-
+        $desiredLabels = $this->desiredSeatList();
         $existing = DB::table('kursi')
             ->where('studio_id', $studioId)
-            ->orderBy('kursi_id')
-            ->pluck('nomor_kursi')
-            ->toArray();
+            ->get()
+            ->keyBy('nomor_kursi');
 
-        $have = count($existing);
-        if ($have >= $minCount) return;
+        $result = [];
+        foreach ($desiredLabels as $label) {
+            if (isset($existing[$label])) {
+                $result[$label] = (int) $existing[$label]->kursi_id;
+            } else {
+                $result[$label] = DB::table('kursi')->insertGetId([
+                    'nomor_kursi' => $label,
+                    'studio_id'   => $studioId,
+                ]);
+            }
+        }
 
-        $toInsert = [];
-        for ($n = $have + 1; $n <= $minCount; $n++) {
-            $toInsert[] = [
-                'nomor_kursi' => $prefix . $n,
-                'studio_id'   => $studioId,
-            ];
-        }
-        if (!empty($toInsert)) {
-            DB::table('kursi')->insert($toInsert);
-        }
+        return $result;
     }
 
     // ================== API ==================
@@ -152,70 +167,69 @@ class JadwalController extends Controller
      */
     public function getSeats($jadwalId, Request $r)
     {
-        [$canonId, $_group, $jd] = $this->canonicalFor((int)$jadwalId);
+        [$canonId, $_group, $jd] = $this->canonicalFor((int) $jadwalId);
 
-        $studioId     = (int)$jd->studio_id;
+        $studioId     = (int) $jd->studio_id;
         $hargaDefault = $this->defaultPrice($studioId);
 
         return DB::transaction(function () use ($canonId, $studioId, $hargaDefault) {
+            $desiredSeats = $this->ensureStudioSeats($studioId);
+            $seatIds = array_values($desiredSeats);
+            $labelOrder = array_keys($desiredSeats);
+            $orderSql = 'FIELD(k.nomor_kursi, ' .
+                implode(',', array_map(fn ($label) => "'" . $label . "'", $labelOrder)) .
+                ')';
 
-            // 1) Jamin kursi studio ada 15
-            $this->ensureStudioSeats($studioId);
-
-            // 2) Ambil semua kursi studio
-            $kursi = DB::table('kursi')
-                ->where('studio_id', $studioId)
-                ->orderBy('kursi_id')
-                ->get(['kursi_id','nomor_kursi']);
-
-            // 3) Seed / repair tiket per kursi di JADWAL KANONIK
-            foreach ($kursi as $k) {
+            foreach ($desiredSeats as $label => $seatId) {
                 $t = DB::table('tiket')
                     ->where('jadwal_id', $canonId)
-                    ->where('kursi_id',  $k->kursi_id)
+                    ->where('kursi_id', $seatId)
                     ->lockForUpdate()
                     ->first();
 
                 if (!$t) {
                     $ins = [
                         'jadwal_id' => $canonId,
-                        'kursi_id'  => $k->kursi_id,
+                        'kursi_id'  => $seatId,
                         'harga'     => $hargaDefault,
                         'status'    => 'tersedia',
                     ];
-                    if ($this->hasCol('tiket','created_at')) $ins['created_at'] = now();
-                    if ($this->hasCol('tiket','updated_at')) $ins['updated_at'] = now();
-                    DB::table('tiket')->insert($ins);
+                    $ins = $this->hasCol('tiket', 'created_at') ? $this->withTimestamps('tiket', $ins) : $ins;
+                    $tid = DB::table('tiket')->insertGetId($ins);
+                    $t = DB::table('tiket')->where('tiket_id', $tid)->first();
                 } else {
-                    // normalisasi status + harga (anti nol)
-                    $status = strtolower((string)($t->status ?? 'tersedia'));
-                    $status = in_array($status, ['terjual','sold']) ? 'terjual' : 'tersedia';
+                    $status = strtolower((string) ($t->status ?? 'tersedia'));
+                    $status = in_array($status, ['sold', 'terjual']) ? 'terjual' : 'tersedia';
 
                     $upd = [];
-                    if ($status !== $t->status) $upd['status'] = $status;
-
-                    $hargaNow = isset($t->harga) ? (float)$t->harga : 0.0;
-                    if ($hargaNow <= 0) $upd['harga'] = $hargaDefault;
-
+                    if ($status !== $t->status) {
+                        $upd['status'] = $status;
+                    }
+                    $hargaNow = isset($t->harga) ? (float) $t->harga : 0.0;
+                    if ($hargaNow <= 0) {
+                        $upd['harga'] = $hargaDefault;
+                    }
                     if (!empty($upd)) {
-                        if ($this->hasCol('tiket','updated_at')) $upd['updated_at'] = now();
+                        if ($this->hasCol('tiket', 'updated_at')) {
+                            $upd['updated_at'] = now();
+                        }
                         DB::table('tiket')->where('tiket_id', $t->tiket_id)->update($upd);
                     }
                 }
             }
 
-            // 4) Kembalikan kursi + status + harga numerik (berdasar JADWAL KANONIK)
             $rows = DB::table('kursi as k')
-                ->leftJoin('tiket as t', function($j) use ($canonId) {
+                ->leftJoin('tiket as t', function ($j) use ($canonId) {
                     $j->on('t.kursi_id', '=', 'k.kursi_id')
                       ->where('t.jadwal_id', '=', $canonId);
                 })
                 ->where('k.studio_id', $studioId)
-                ->orderBy('k.kursi_id')
+                ->whereIn('k.kursi_id', $seatIds)
+                ->orderByRaw($orderSql)
                 ->get([
                     'k.kursi_id',
                     DB::raw('COALESCE(k.nomor_kursi, CONCAT("S", k.kursi_id)) as nama_kursi'),
-                    DB::raw('(CASE WHEN t.harga IS NULL OR t.harga <= 0 THEN '.$hargaDefault.' ELSE t.harga END) + 0 as harga'),
+                    DB::raw('(CASE WHEN t.harga IS NULL OR t.harga <= 0 THEN ' . $hargaDefault . ' ELSE t.harga END) + 0 as harga'),
                     DB::raw('CASE LOWER(COALESCE(t.status,"tersedia"))
                                 WHEN "sold" THEN "terjual"
                                 WHEN "terjual" THEN "terjual"
@@ -224,13 +238,12 @@ class JadwalController extends Controller
                     DB::raw('t.tiket_id as tiket_id'),
                 ]);
 
-            // pastikan numeric & alias
             $rows = $rows->map(function ($r) {
-                $num = (int) round((float) ($r->harga ?? 0));
-                $r->harga     = $num;
-                $r->price     = $num;
-                $r->harga_int = $num;
-                $r->status    = strtolower($r->status ?? 'tersedia') === 'terjual' ? 'terjual' : 'tersedia';
+                $amount = (int) round((float) ($r->harga ?? 0));
+                $r->harga = $amount;
+                $r->price = $amount;
+                $r->harga_int = $amount;
+                $r->status = strtolower($r->status ?? 'tersedia') === 'terjual' ? 'terjual' : 'tersedia';
                 return $r;
             });
 
