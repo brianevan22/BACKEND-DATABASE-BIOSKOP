@@ -38,6 +38,15 @@ class JadwalController extends Controller
         return $map[$studioId] ?? 50000;
     }
 
+    private function filmPrice(?int $filmId): ?int
+    {
+        if (!$filmId) return null;
+        $harga = DB::table('film')->where('film_id', $filmId)->value('harga');
+        if ($harga === null) return null;
+        $value = (int)$harga;
+        return $value > 0 ? $value : null;
+    }
+
     /** Cari grup slot dan jadwal kanonik (id terkecil) untuk sebuah jadwal */
     private function canonicalFor(int $jadwalId): array
     {
@@ -170,7 +179,8 @@ class JadwalController extends Controller
         [$canonId, $_group, $jd] = $this->canonicalFor((int) $jadwalId);
 
         $studioId     = (int) $jd->studio_id;
-        $hargaDefault = $this->defaultPrice($studioId);
+        $filmHarga    = $this->filmPrice((int) ($jd->film_id ?? null));
+        $hargaDefault = $filmHarga ?? $this->defaultPrice($studioId);
 
         return DB::transaction(function () use ($canonId, $studioId, $hargaDefault) {
             $desiredSeats = $this->ensureStudioSeats($studioId);
@@ -205,8 +215,8 @@ class JadwalController extends Controller
                     if ($status !== $t->status) {
                         $upd['status'] = $status;
                     }
-                    $hargaNow = isset($t->harga) ? (float) $t->harga : 0.0;
-                    if ($hargaNow <= 0) {
+                    $hargaNow = isset($t->harga) ? (int) round((float) $t->harga) : 0;
+                    if ($hargaNow !== $hargaDefault) {
                         $upd['harga'] = $hargaDefault;
                     }
                     if (!empty($upd)) {
@@ -214,6 +224,7 @@ class JadwalController extends Controller
                             $upd['updated_at'] = now();
                         }
                         DB::table('tiket')->where('tiket_id', $t->tiket_id)->update($upd);
+                        $t->harga = $upd['harga'] ?? $t->harga;
                     }
                 }
             }

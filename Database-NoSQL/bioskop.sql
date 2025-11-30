@@ -117,19 +117,21 @@ CREATE TABLE `film` (
   `judul` varchar(200) NOT NULL,
   `durasi` int(11) NOT NULL,
   `sinopsis` text DEFAULT NULL,
-  `genre_id` int(11) DEFAULT NULL
+  `genre_id` int(11) DEFAULT NULL,
+  `harga` int(11) NOT NULL DEFAULT 0,
+  `poster` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data untuk tabel `film`
 --
 
-INSERT INTO `film` (`film_id`, `judul`, `durasi`, `sinopsis`, `genre_id`) VALUES
-(1, 'Avengers: Endgame', 181, 'Pertarungan terakhir melawan Thanos demi menyelamatkan alam semesta.', 1),
-(2, 'Laskar Pelangi', 120, 'Kisah anak-anak di Belitung yang penuh semangat meraih mimpi.', 2),
-(3, 'My Stupid Boss', 110, 'Komedian karyawan yang menghadapi bos eksentrik.', 3),
-(4, 'Pengabdi Setan', 107, 'Keluarga diteror makhluk gaib setelah kematian ibu.', 4),
-(5, 'Toy Story 4', 100, 'Petualangan Woody, Buzz dan mainan lainnya menemukan arti keluarga.', 5);
+INSERT INTO `film` (`film_id`, `judul`, `durasi`, `sinopsis`, `genre_id`, `harga`, `poster`) VALUES
+(1, 'Avengers: Endgame', 181, 'Pertarungan terakhir melawan Thanos demi menyelamatkan alam semesta.', 1, 75000, 'Avangers_EndGame.png'),
+(2, 'Laskar Pelangi', 120, 'Kisah anak-anak di Belitung yang penuh semangat meraih mimpi.', 2, 60000, 'LaskarPelangi.png'),
+(3, 'My Stupid Boss', 110, 'Komedian karyawan yang menghadapi bos eksentrik.', 3, 55000, 'MyStupidBoss.png'),
+(4, 'Pengabdi Setan', 107, 'Keluarga diteror makhluk gaib setelah kematian ibu.', 4, 70000, 'PengabdiSetan.png'),
+(5, 'Toy Story 4', 100, 'Petualangan Woody, Buzz dan mainan lainnya menemukan arti keluarga.', 5, 65000, 'ToyStory_4.png');
 
 -- --------------------------------------------------------
 

@@ -666,13 +666,15 @@ Route::post('/checkout', function (Request $r) {
     $studioId = (int)$jd->studio_id;
     $filmId   = (int)($jd->film_id ?? 0);
 
-    $withTimestamps = function (string $table, array $data) {
-        if (Schema::hasColumn($table, 'created_at')) $data['created_at'] = now();
-        if (Schema::hasColumn($table, 'updated_at')) $data['updated_at'] = now();
-        return $data;
-    };
-
-    $defaultPrice = (function(int $studio) {
+    $filmHarga = null;
+    if ($filmId > 0) {
+        $hargaVal = DB::table('film')->where('film_id', $filmId)->value('harga');
+        if ($hargaVal !== null) {
+            $tmp = (int)$hargaVal;
+            if ($tmp > 0) $filmHarga = $tmp;
+        }
+    }
+    $defaultPrice = $filmHarga ?? (function(int $studio) {
         $map = [1 => 50000, 2 => 100000, 3 => 75000];
         return $map[$studio] ?? 50000;
     })($studioId);
@@ -736,9 +738,12 @@ Route::post('/checkout', function (Request $r) {
                 abort(response()->json(['message' => "Kursi $kid sudah terjual"], 409));
             }
 
-            // Harga anti 0
-            if ((float)($t->harga ?? 0) <= 0) {
-                $upd = ['harga' => $defaultPrice];
+            $upd = [];
+            $hargaNow = isset($t->harga) ? (int)round((float)$t->harga) : 0;
+            if ($hargaNow !== $defaultPrice) {
+                $upd['harga'] = $defaultPrice;
+            }
+            if (!empty($upd)) {
                 if (Schema::hasColumn('tiket','updated_at')) $upd['updated_at'] = now();
                 DB::table('tiket')->where('tiket_id', $t->tiket_id)->update($upd);
                 $t->harga = $defaultPrice;
