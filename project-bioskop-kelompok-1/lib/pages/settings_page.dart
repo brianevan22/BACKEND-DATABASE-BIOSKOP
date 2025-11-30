@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../api_service.dart';
-import '../main.dart';
 import '../theme/app_theme.dart';
 import '../theme/bubble_container.dart';
 
@@ -14,7 +13,6 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
-    final controller = MyApp.of(context);
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: cs.background,
@@ -34,13 +32,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SnackBar(
                         content: Text('Fitur profil belum tersedia')),
                   ),
-                ),
-                const Divider(),
-                SwitchListTile(
-                  secondary: const Icon(Icons.dark_mode),
-                  title: const Text('Tema gelap'),
-                  value: controller.isDark,
-                  onChanged: controller.setDark,
                 ),
                 const Divider(),
                 ListTile(

@@ -60,7 +60,7 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: 'Lotus Cinema',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
+      theme: AppTheme.dark,
       darkTheme: AppTheme.dark,
       themeMode: _controller.mode,
       home: const SplashScreen(),
