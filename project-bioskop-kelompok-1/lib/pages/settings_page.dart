@@ -31,7 +31,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: const Text('Profil'),
                   subtitle: const Text('Lihat dan ubah informasi akun'),
                   onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Fitur profil belum tersedia')),
+                    const SnackBar(
+                        content: Text('Fitur profil belum tersedia')),
                   ),
                 ),
                 const Divider(),
