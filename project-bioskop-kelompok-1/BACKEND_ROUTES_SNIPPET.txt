@@ -1,0 +1,99 @@
+
+Put these BEFORE your dynamic /api/{table} routes in routes/api.php:
+
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
+
+Route::get('/ping', fn() => response()->json(['pong' => now()->toISOString()]));
+
+// 1) Jadwal by film
+Route::get('/jadwal/by-film/{film_id}', function (Request $r, $film_id) {
+    $date = $r->query('date'); // optional YYYY-MM-DD
+    $q = DB::table('jadwal')->where('film_id', $film_id);
+    if ($date) $q->whereDate('tanggal', $date);
+    return $q->orderBy('tanggal')->orderBy('jam_mulai')->get();
+});
+
+// 2) Kursi tersedia untuk jadwal
+Route::get('/jadwal/{jadwal_id}/kursi-tersedia', function ($jadwal_id) {
+    $rows = DB::select("
+        SELECT k.*, t.tiket_id, t.harga, t.status
+        FROM kursi k
+        LEFT JOIN tiket t ON t.kursi_id = k.kursi_id AND t.jadwal_id = ?
+        WHERE t.tiket_id IS NULL OR (t.status IS NULL OR t.status NOT IN ('sold','terjual'))
+        ORDER BY k.kursi_id
+    ", [$jadwal_id]);
+    return $rows;
+});
+
+// 3) Checkout (buat transaksi + detail_transaksi + set tiket 'sold')
+Route::post('/checkout', function (Request $r) {
+    $data = $r->validate([
+        'customer_id' => 'required|integer',
+        'jadwal_id'   => 'required|integer',
+        'kursi_ids'   => 'required|array|min:1',
+        'kursi_ids.*' => 'integer',
+        'kasir_id'    => 'nullable|integer',
+    ]);
+
+    return DB::transaction(function () use ($data) {
+        // Lock tiket rows for update
+        $tickets = DB::table('tiket')
+            ->where('jadwal_id', $data['jadwal_id'])
+            ->whereIn('kursi_id', $data['kursi_ids'])
+            ->lockForUpdate()
+            ->get();
+
+        // Create missing tickets if needed (fallback harga)
+        if (count($tickets) != count($data['kursi_ids'])) {
+            $hargaDefault = DB::table('tiket')->where('jadwal_id', $data['jadwal_id'])->value('harga') ?? 50000;
+            $existing = $tickets->pluck('kursi_id')->all();
+            $missing = array_values(array_diff($data['kursi_ids'], $existing));
+            foreach ($missing as $kursi_id) {
+                DB::table('tiket')->insert([
+                    'jadwal_id' => $data['jadwal_id'],
+                    'kursi_id'  => $kursi_id,
+                    'harga'     => $hargaDefault,
+                    'status'    => 'available',
+                ]);
+            }
+            $tickets = DB::table('tiket')
+                ->where('jadwal_id', $data['jadwal_id'])
+                ->whereIn('kursi_id', $data['kursi_ids'])
+                ->lockForUpdate()
+                ->get();
+        }
+
+        foreach ($tickets as $t) {
+            $st = strtolower((string)($t->status ?? 'available'));
+            if (in_array($st, ['sold','terjual','booked','dibeli'])) {
+                abort(409, "Kursi {$t->kursi_id} sudah terjual/terbooking.");
+            }
+        }
+
+        $total = $tickets->sum('harga');
+
+        $transaksi_id = DB::table('transaksi')->insertGetId([
+            'customer_id'        => $data['customer_id'],
+            'kasir_id'           => $data['kasir_id'] ?? null,
+            'tanggal_transaksi'  => now(),
+            'total_harga'        => $total,
+        ]);
+
+        foreach ($tickets as $t) {
+            DB::table('detail_transaksi')->insert([
+                'transaksi_id' => $transaksi_id,
+                'tiket_id'     => $t->tiket_id,
+                'harga'        => $t->harga,
+            ]);
+            DB::table('tiket')->where('tiket_id', $t->tiket_id)->update(['status' => 'sold']);
+        }
+
+        return [
+            'transaksi_id' => $transaksi_id,
+            'total_harga'  => $total,
+            'jumlah_kursi' => count($tickets),
+        ];
+    });
+});
