@@ -9,7 +9,7 @@ class SettingsPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: cs.background,
-      appBar: AppTheme.buildGradientAppBar(context, 'Pengaturan'),
+      appBar: AppTheme.buildGradientAppBar(context, 'Lotus Cinema'),
       body: ListView(
         padding: const EdgeInsets.all(18),
         children: [
@@ -30,7 +30,7 @@ class SettingsPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Aplikasi Lotus Cinema adalah sistem pemesanan tiket bioskop modern yang memudahkan Anda melihat jadwal film, memilih kursi, dan melakukan pembayaran secara online.\n\nDikembangkan oleh Kelompok 1 Mata Kuliah Basis Data.',
+                  'Aplikasi Lotus Cinema adalah sistem pemesanan tiket bioskop modern yang memudahkan Anda melihat jadwal film, memilih kursi, dan melakukan pembayaran secara online.\n\nDikembangkan oleh Tim Korlap PSDKU.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: cs.onSurfaceVariant, fontSize: 16),
                 ),

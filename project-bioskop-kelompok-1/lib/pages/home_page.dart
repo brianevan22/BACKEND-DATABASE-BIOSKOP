@@ -110,7 +110,7 @@ class _HomePageState extends State<HomePage> {
             _HomeTile(
               icon: Icons.info_outline,
               title: 'Tentang Aplikasi',
-              subtitle: 'Tentang aplikasi Lotus Cinema dan pengembangnya',
+              subtitle: 'Informasi Lotus Cinema dan pengembangnya',
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsPage()),
