@@ -707,6 +707,13 @@ Route::post('/checkout', function (Request $r) {
         ]);
     };
 
+    // Tambahkan helper $withTimestamps di sini
+    $withTimestamps = function(string $table, array $data) {
+        if (Schema::hasColumn($table, 'created_at')) $data['created_at'] = now();
+        if (Schema::hasColumn($table, 'updated_at')) $data['updated_at'] = now();
+        return $data;
+    };
+
     return DB::transaction(function () use (
         $ids, $customerForTrans, $canonId, $kasirId, $defaultPrice, $withTimestamps, $ensureKursiId, $filmId
     ) {
