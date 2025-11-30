@@ -52,10 +52,40 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: cs.background,
       body: Center(
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset('assets/logo.png', width: 160, height: 160),
-            const SizedBox(height: 16),
+            // Logo bulat dengan shadow
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.primary.withOpacity(0.35),
+                    blurRadius: 18,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                radius: 80,
+                backgroundColor: cs.primary,
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/logo.png', // ganti dengan path logo project Anda
+                    width: 200,
+                    height: 200,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Icon(
+                      Icons.movie,
+                      color: Colors.white,
+                      size: 48,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
             BubbleContainer(
               gradient: true,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),

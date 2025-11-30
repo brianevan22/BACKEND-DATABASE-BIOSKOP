@@ -96,18 +96,46 @@ class _LoginPageState extends State<LoginPage> {
                         Column(
                           children: [
                             // small logo circle
-                            CircleAvatar(
-                              radius: 36,
-                              backgroundColor: cs.primary,
-                              child: const Icon(Icons.movie,
-                                  color: Colors.white, size: 36),
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: cs.primary.withOpacity(0.35),
+                                    blurRadius: 18,
+                                    spreadRadius: 2,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 80,
+                                backgroundColor: cs.primary,
+                                child: ClipOval(
+                                  child: Image.asset(
+                                    'assets/logo.png', // ganti dengan path logo project Anda
+                                    width: 200,
+                                    height: 200,
+                                    fit: BoxFit.contain,
+                                    errorBuilder:
+                                        (context, error, stackTrace) => Icon(
+                                            Icons.movie,
+                                            color: Colors.white,
+                                            size: 48),
+                                  ),
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 14),
-                            Text('Selamat datang di Lotus Cinema',
-                                style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w700,
-                                    color: cs.primary)),
+                            // Pusatkan tulisan selamat datang
+                            Text(
+                              'Selamat datang di Lotus Cinema',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.primary),
+                            ),
                             const SizedBox(height: 6),
                             Text('Silahkan login dahulu.',
                                 style: TextStyle(
@@ -175,7 +203,8 @@ class _LoginPageState extends State<LoginPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text('Tidak punya akun? ',
-                          style: TextStyle(color: Colors.grey.shade700)),
+                          style: TextStyle(
+                              color: const Color.fromARGB(255, 160, 160, 160))),
                       TextButton(
                         onPressed: () => Navigator.push(
                             context,
