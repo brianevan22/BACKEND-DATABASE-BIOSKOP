@@ -110,7 +110,9 @@ class _LoginPageState extends State<LoginPage> {
                                     color: cs.primary)),
                             const SizedBox(height: 6),
                             Text('Silahkan login dahulu.',
-                                style: TextStyle(color: Colors.grey.shade700)),
+                                style: TextStyle(
+                                    color: const Color.fromARGB(
+                                        255, 199, 198, 198))),
                           ],
                         ),
                       ],
@@ -162,13 +164,6 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const RegistrationPage())),
-                            child: const Text('Lupa password?'),
-                          ),
                         ],
                       ),
                     ),
