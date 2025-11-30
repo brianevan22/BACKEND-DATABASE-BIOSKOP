@@ -66,10 +66,10 @@ class ApiService {
   late final String _effectiveBaseUrl;
 
   static String suggestBaseUrl() {
-    if (kIsWeb) return 'http://127.0.0.1:8000';
+    if (kIsWeb) return 'https://lotus-cinema.wuaze.com';
     if (defaultTargetPlatform == TargetPlatform.android)
-      return 'http://10.0.2.2:8000';
-    return 'http://127.0.0.1:8000';
+      return 'https://lotus-cinema.wuaze.com';
+    return 'https://lotus-cinema.wuaze.com';
   }
 
   static String _normalizeBaseUrl(String raw) {
