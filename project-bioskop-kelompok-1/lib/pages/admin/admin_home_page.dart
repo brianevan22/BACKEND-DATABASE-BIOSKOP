@@ -99,9 +99,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
             elevation: 3,
             margin: EdgeInsets.zero,
             child: ListTile(
-              leading: Icon(Icons.settings, color: primary),
-              title: const Text('Pengaturan'),
-              subtitle: const Text('Profil, tema, preferensi'),
+              leading: Icon(Icons.info_outline, color: primary),
+              title: const Text('Tentang Aplikasi'),
+              subtitle:
+                  const Text('Tentang aplikasi Lotus Cinema dan pengembangnya'),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsPage()),

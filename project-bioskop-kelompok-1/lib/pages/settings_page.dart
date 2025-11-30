@@ -1,16 +1,9 @@
 import 'package:flutter/material.dart';
-import '../api_service.dart';
 import '../theme/app_theme.dart';
-import '../theme/bubble_container.dart';
 
-class SettingsPage extends StatefulWidget {
+class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
-  @override
-  State<SettingsPage> createState() => _SettingsPageState();
-}
-
-class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -18,30 +11,33 @@ class _SettingsPageState extends State<SettingsPage> {
       backgroundColor: cs.background,
       appBar: AppTheme.buildGradientAppBar(context, 'Pengaturan'),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         children: [
-          BubbleContainer(
-            padding: const EdgeInsets.all(16),
+          const SizedBox(height: 32),
+          Center(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ListTile(
-                  leading: const Icon(Icons.person),
-                  title: const Text('Profil'),
-                  subtitle: const Text('Lihat dan ubah informasi akun'),
-                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Fitur profil belum tersedia')),
+                Icon(Icons.info_outline, size: 48, color: cs.primary),
+                const SizedBox(height: 16),
+                Text(
+                  'Tentang Aplikasi',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: cs.primary,
                   ),
                 ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.info_outline),
-                  title: const Text('Tentang aplikasi'),
-                  onTap: () => showAboutDialog(
-                    context: context,
-                    applicationName: 'BioskopKu',
-                    applicationVersion: '1.0.0',
-                  ),
+                const SizedBox(height: 12),
+                Text(
+                  'Aplikasi Lotus Cinema adalah sistem pemesanan tiket bioskop modern yang memudahkan Anda melihat jadwal film, memilih kursi, dan melakukan pembayaran secara online.\n\nDikembangkan oleh Kelompok 1 Mata Kuliah Basis Data.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 16),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Versi 1.0.0',
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
                 ),
               ],
             ),

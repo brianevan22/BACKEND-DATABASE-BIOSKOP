@@ -100,7 +100,7 @@ class _HomePageState extends State<HomePage> {
             _HomeTile(
               icon: Icons.movie_outlined,
               title: 'Daftar Film',
-              subtitle: 'Lihat film dari database',
+              subtitle: 'Lihat film dan pesan tiket',
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const FilmListPage()),
@@ -108,9 +108,9 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 16),
             _HomeTile(
-              icon: Icons.settings,
-              title: 'Pengaturan',
-              subtitle: 'Profil, tema, dan lainnya',
+              icon: Icons.info_outline,
+              title: 'Tentang Aplikasi',
+              subtitle: 'Tentang aplikasi Lotus Cinema dan pengembangnya',
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsPage()),
